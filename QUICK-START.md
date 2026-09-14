@@ -52,8 +52,18 @@ npm start
 
 ### 4. Test
 
+**Note:** Qwen Proxy v2 requires API key authentication. You'll need to:
+1. Set up Supabase database (see `DATABASE-SETUP.md`)
+2. Create an admin API key (run `node scripts/create-admin-key.js`)
+3. Use the API key in your requests
+
 ```bash
+# First, verify credentials are working
+curl http://localhost:3000/health/credentials
+
+# Then test with your API key
 curl http://localhost:3000/v1/chat/completions \
+  -H "Authorization: Bearer sk-your-api-key-here" \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3.7-plus","messages":[{"role":"user","content":"Hello"}],"stream":false}'
 ```

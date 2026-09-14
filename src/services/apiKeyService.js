@@ -189,6 +189,7 @@ export async function validateApiKey(key) {
 
 /**
  * Update usage statistics for an API key
+ * Uses atomic database function to prevent race conditions
  * @param {string} keyId - UUID of the key
  */
 export async function updateUsageStats(keyId) {
@@ -197,29 +198,13 @@ export async function updateUsageStats(keyId) {
   }
 
   try {
-    // Get current usage count
-    const { data: currentKey, error: fetchError } = await supabase
-      .from('api_keys')
-      .select('usage_count')
-      .eq('id', keyId)
-      .single();
+    // Use atomic increment function to avoid race conditions
+    const { error } = await supabase.rpc('increment_api_key_usage', {
+      key_id: keyId
+    });
 
-    if (fetchError) {
-      console.error('[API Key Service] Fetch usage error:', fetchError);
-      return;
-    }
-
-    // Update last_used_at and increment usage_count
-    const { error: updateError } = await supabase
-      .from('api_keys')
-      .update({
-        last_used_at: new Date().toISOString(),
-        usage_count: (currentKey?.usage_count || 0) + 1
-      })
-      .eq('id', keyId);
-
-    if (updateError) {
-      console.error('[API Key Service] Update usage error:', updateError);
+    if (error) {
+      console.error('[API Key Service] Update usage error:', error);
     }
   } catch (error) {
     console.error('[API Key Service] Update usage stats error:', error);

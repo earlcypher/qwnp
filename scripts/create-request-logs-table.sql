@@ -44,7 +44,10 @@ CREATE POLICY "Service role has full access to request_logs" ON request_logs
   WITH CHECK (true);
 
 -- View for aggregated stats (faster queries)
-CREATE OR REPLACE VIEW request_stats AS
+-- SECURITY: security_invoker = true prevents privilege escalation
+-- The view runs with the privileges of the caller, not the view owner
+CREATE OR REPLACE VIEW request_stats
+WITH (security_invoker = true) AS
 SELECT
   api_key_id,
   DATE(created_at) as date,

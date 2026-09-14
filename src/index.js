@@ -40,6 +40,23 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root endpoint - basic service info
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Qwen Proxy API',
+    version: '2.0',
+    status: 'operational',
+    endpoints: {
+      health: '/health',
+      credentials: '/health/credentials',
+      models: '/v1/models',
+      chat: '/v1/chat/completions',
+      admin: '/admin/*'
+    },
+    documentation: 'https://github.com/earlcypher/qwnp'
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
