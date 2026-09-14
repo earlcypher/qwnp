@@ -7,6 +7,10 @@ import {
   transformToQwenRequest,
   createOpenAIResponse
 } from './utils.js';
+import { requireAuth } from './middleware/authMiddleware.js';
+import adminRoutes from './routes/adminRoutes.js';
+import supabase from './supabaseClient.js';
+
 
 const app = express();
 
@@ -66,8 +70,11 @@ app.get('/health/credentials', async (req, res) => {
   }
 });
 
+// Admin API routes (requires enterprise tier API key)
+app.use('/admin', adminRoutes);
+
 // Get models - OpenAI compatible
-app.get('/v1/models', async (req, res) => {
+app.get('/v1/models', requireAuth, async (req, res) => {
   try {
     const qwenModels = await qwenClient.getModels();
 
@@ -146,7 +153,7 @@ app.get('/v1/models', async (req, res) => {
 });
 
 // Chat completions - OpenAI compatible
-app.post('/v1/chat/completions', async (req, res) => {
+app.post('/v1/chat/completions', requireAuth, async (req, res) => {
   try {
     const openaiRequest = req.body;
 
