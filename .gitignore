@@ -1,0 +1,14 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# Sensitive authentication files
+cookies.txt
+headers.json
+api-keys.json
+
+# Test/demo data
+.chat-history.json
+captured-network.txt
+endpoints.txt

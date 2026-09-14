@@ -1,0 +1,11 @@
+Qwen Web Chat To Proxy API Server
+
+Make the server lightweight, reliable, and functional. (Nodejs or plain Javascript run in Nodejs)
+
+Using Qwen Web Cookies as Auth for Chat completion from Qwen Web Chat.
+
+And make the Proxy Server are OpenAI Compatibility.
+
+For more information about Qwen Web Chat, look for this files:
+- Endpoints: endpoints.txt
+- Cookies: cookies.txt
