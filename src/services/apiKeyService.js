@@ -196,16 +196,33 @@ export async function updateUsageStats(keyId) {
     return;
   }
 
-  const { error } = await supabase
-    .from('api_keys')
-    .update({
-      last_used_at: new Date().toISOString(),
-      usage_count: supabase.raw('usage_count + 1')
-    })
-    .eq('id', keyId);
+  try {
+    // Get current usage count
+    const { data: currentKey, error: fetchError } = await supabase
+      .from('api_keys')
+      .select('usage_count')
+      .eq('id', keyId)
+      .single();
 
-  if (error) {
-    console.error('[API Key Service] Update usage error:', error);
+    if (fetchError) {
+      console.error('[API Key Service] Fetch usage error:', fetchError);
+      return;
+    }
+
+    // Update last_used_at and increment usage_count
+    const { error: updateError } = await supabase
+      .from('api_keys')
+      .update({
+        last_used_at: new Date().toISOString(),
+        usage_count: (currentKey?.usage_count || 0) + 1
+      })
+      .eq('id', keyId);
+
+    if (updateError) {
+      console.error('[API Key Service] Update usage error:', updateError);
+    }
+  } catch (error) {
+    console.error('[API Key Service] Update usage stats error:', error);
     // Don't throw - usage tracking is non-critical
   }
 }
