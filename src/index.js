@@ -8,6 +8,7 @@ import {
   createOpenAIResponse
 } from './utils.js';
 import { requireAuth } from './middleware/authMiddleware.js';
+import { requestLogger } from './middleware/requestLogger.js';
 import adminRoutes from './routes/adminRoutes.js';
 import supabase from './supabaseClient.js';
 
@@ -17,11 +18,14 @@ const app = express();
 // Middleware
 app.use(express.json());
 
-// Request logging
+// Request logging (console + database)
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
+
+// Analytics logging middleware (logs to Supabase)
+app.use(requestLogger);
 
 // CORS headers
 app.use((req, res, next) => {

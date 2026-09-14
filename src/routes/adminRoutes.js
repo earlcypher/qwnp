@@ -5,8 +5,13 @@ import {
   getApiKey,
   updateApiKey,
   deleteApiKey,
-  getUsageStats
+  getUsageStats as getApiKeyStats
 } from '../services/apiKeyService.js';
+import {
+  getRequestLogs,
+  getUsageStats,
+  getKeyStats
+} from '../services/analyticsService.js';
 import { requireAdmin } from '../middleware/authMiddleware.js';
 import supabase from '../supabaseClient.js';
 
@@ -17,16 +22,8 @@ const router = express.Router();
  * All routes require enterprise tier API key (admin access)
  */
 
-/**
- * POST /admin/api-keys
- * Create a new API key
- *
- * Body:
- * {
- *   "name": "My API Key",
- *   "tier": "free" | "premium" | "enterprise"
- * }
- */
+// ===== API Key Management Routes (existing) =====
+
 router.post('/api-keys', requireAdmin, async (req, res) => {
   try {
     const { name, tier = 'free' } = req.body;
@@ -57,7 +54,7 @@ router.post('/api-keys', requireAdmin, async (req, res) => {
       success: true,
       data: {
         id: apiKey.id,
-        key: apiKey.key, // Only returned on creation
+        key: apiKey.key,
         name: apiKey.name,
         tier: apiKey.tier,
         is_active: apiKey.is_active,
@@ -76,13 +73,6 @@ router.post('/api-keys', requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * GET /admin/api-keys
- * List all API keys
- *
- * Query params:
- * - active_only: true | false (default: false)
- */
 router.get('/api-keys', requireAdmin, async (req, res) => {
   try {
     const activeOnly = req.query.active_only === 'true';
@@ -98,7 +88,6 @@ router.get('/api-keys', requireAdmin, async (req, res) => {
         created_at: k.created_at,
         last_used_at: k.last_used_at,
         usage_count: k.usage_count
-        // Note: key value is never returned in list/get operations for security
       })),
       count: keys.length
     });
@@ -114,16 +103,10 @@ router.get('/api-keys', requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * GET /admin/api-keys/:id
- * Get specific API key by ID
- */
 router.get('/api-keys/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // We need to get by ID, but our getApiKey function gets by key string
-    // So we'll use a direct Supabase query here
     const { data, error } = await supabase
       .from('api_keys')
       .select('id, name, tier, is_active, created_at, last_used_at, usage_count')
@@ -156,17 +139,6 @@ router.get('/api-keys/:id', requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * PUT /admin/api-keys/:id
- * Update API key
- *
- * Body:
- * {
- *   "name": "Updated name",
- *   "tier": "premium",
- *   "is_active": true
- * }
- */
 router.put('/api-keys/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -224,10 +196,6 @@ router.put('/api-keys/:id', requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * DELETE /admin/api-keys/:id
- * Delete (deactivate) API key
- */
 router.delete('/api-keys/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -255,13 +223,9 @@ router.delete('/api-keys/:id', requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * GET /admin/stats
- * Get usage statistics
- */
 router.get('/stats', requireAdmin, async (req, res) => {
   try {
-    const stats = await getUsageStats();
+    const stats = await getApiKeyStats();
 
     res.json({
       success: true,
@@ -274,6 +238,113 @@ router.get('/stats', requireAdmin, async (req, res) => {
         message: 'Failed to get statistics',
         type: 'internal_error',
         code: 'stats_failed'
+      }
+    });
+  }
+});
+
+// ===== NEW: Analytics Routes =====
+
+/**
+ * GET /admin/analytics/logs
+ * Get request logs with optional filters
+ *
+ * Query params:
+ * - limit: number (default 100)
+ * - offset: number (default 0)
+ * - api_key_id: UUID (filter by specific key)
+ * - status_code: number (filter by status)
+ * - start_date: ISO date string
+ * - end_date: ISO date string
+ */
+router.get('/analytics/logs', requireAdmin, async (req, res) => {
+  try {
+    const filters = {
+      limit: parseInt(req.query.limit) || 100,
+      offset: parseInt(req.query.offset) || 0,
+      apiKeyId: req.query.api_key_id || null,
+      statusCode: req.query.status_code ? parseInt(req.query.status_code) : null,
+      startDate: req.query.start_date || null,
+      endDate: req.query.end_date || null
+    };
+
+    const result = await getRequestLogs(filters);
+
+    res.json({
+      success: true,
+      data: result.logs,
+      pagination: {
+        limit: filters.limit,
+        offset: filters.offset,
+        total: result.total
+      }
+    });
+  } catch (error) {
+    console.error('[Admin] Get logs error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to fetch request logs',
+        type: 'internal_error',
+        code: 'logs_fetch_failed'
+      }
+    });
+  }
+});
+
+/**
+ * GET /admin/analytics/usage
+ * Get aggregated usage statistics
+ *
+ * Query params:
+ * - days: number (default 7, last N days)
+ * - api_key_id: UUID (filter by specific key)
+ */
+router.get('/analytics/usage', requireAdmin, async (req, res) => {
+  try {
+    const filters = {
+      days: parseInt(req.query.days) || 7,
+      apiKeyId: req.query.api_key_id || null
+    };
+
+    const stats = await getUsageStats(filters);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('[Admin] Get usage stats error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to fetch usage statistics',
+        type: 'internal_error',
+        code: 'usage_stats_failed'
+      }
+    });
+  }
+});
+
+/**
+ * GET /admin/analytics/keys/:id
+ * Get detailed statistics for a specific API key
+ */
+router.get('/analytics/keys/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const stats = await getKeyStats(id);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('[Admin] Get key stats error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to fetch key statistics',
+        type: 'internal_error',
+        code: 'key_stats_failed'
       }
     });
   }
