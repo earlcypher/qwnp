@@ -1,4 +1,5 @@
 import https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import config from './config.js';
 import { generateRequestId, getTimezoneHeader } from './utils.js';
 
@@ -14,6 +15,14 @@ class QwenClient {
     this.cookieString = config.getCookieString();
     this.token = config.getCookie('token');
     this.umidtoken = config.getCookie('bx-umidtoken') || 'T2gApOqwXfrS_qPdaTRShpgfFvvoyj4k6be6dFIPviLbe-swbd43bPpabeGVLmNlEY4=';
+
+    // Initialize proxy agent if PROXY_URL is set
+    if (process.env.PROXY_URL) {
+      this.proxyAgent = new HttpsProxyAgent(process.env.PROXY_URL);
+      console.log('✓ Proxy enabled:', process.env.PROXY_URL.split('@')[1] || 'configured');
+    } else {
+      this.proxyAgent = null;
+    }
   }
 
   /**
@@ -70,7 +79,8 @@ class QwenClient {
         headers: {
           ...this.getHeaders('new-chat'),
           'Content-Length': Buffer.byteLength(bodyStr)
-        }
+        },
+        agent: this.proxyAgent
       };
 
       const req = https.request(options, (res) => {
@@ -118,7 +128,8 @@ class QwenClient {
         hostname: QWEN_BASE_URL,
         path: MODELS_ENDPOINT,
         method: 'GET',
-        headers: this.getHeaders('')
+        headers: this.getHeaders(''),
+        agent: this.proxyAgent
       };
 
       const req = https.request(options, (res) => {
@@ -161,7 +172,8 @@ class QwenClient {
         headers: {
           ...this.getHeaders(chatId),
           'Content-Length': Buffer.byteLength(bodyStr)
-        }
+        },
+        agent: this.proxyAgent
       };
 
       console.log('[Qwen API] Request URL:', `https://${options.hostname}${options.path}`);
