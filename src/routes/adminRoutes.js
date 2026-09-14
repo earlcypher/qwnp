@@ -14,6 +14,7 @@ import {
 } from '../services/analyticsService.js';
 import { requireAdmin } from '../middleware/authMiddleware.js';
 import supabase from '../supabaseClient.js';
+import cookieService from '../services/cookieService.js';
 
 const router = express.Router();
 
@@ -345,6 +346,94 @@ router.get('/analytics/keys/:id', requireAdmin, async (req, res) => {
         message: 'Failed to fetch key statistics',
         type: 'internal_error',
         code: 'key_stats_failed'
+      }
+    });
+  }
+});
+
+// ===== Cookie Management Routes =====
+
+/**
+ * GET /admin/cookies/status
+ * Get cookie file status and metadata
+ */
+router.get('/cookies/status', requireAdmin, async (req, res) => {
+  try {
+    const status = cookieService.getCookieStatus();
+
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    console.error('[Admin] Get cookie status error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to get cookie status',
+        type: 'internal_error',
+        code: 'cookie_status_failed'
+      }
+    });
+  }
+});
+
+/**
+ * POST /admin/cookies/upload
+ * Upload new cookies file content
+ * Body: { content: string } - Netscape cookie format
+ */
+router.post('/cookies/upload', requireAdmin, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({
+        error: {
+          message: 'Missing or invalid content field',
+          type: 'validation_error',
+          code: 'invalid_content'
+        }
+      });
+    }
+
+    const result = cookieService.updateCookies(content);
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Cookies updated successfully'
+    });
+  } catch (error) {
+    console.error('[Admin] Upload cookies error:', error);
+    res.status(400).json({
+      error: {
+        message: error.message || 'Failed to update cookies',
+        type: 'validation_error',
+        code: 'cookie_update_failed'
+      }
+    });
+  }
+});
+
+/**
+ * POST /admin/cookies/test
+ * Test connection to Qwen API with current cookies
+ */
+router.post('/cookies/test', requireAdmin, async (req, res) => {
+  try {
+    const result = await cookieService.testConnection();
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('[Admin] Test cookies error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to test connection',
+        type: 'internal_error',
+        code: 'cookie_test_failed'
       }
     });
   }
