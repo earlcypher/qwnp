@@ -15,33 +15,45 @@ class Config {
 
   loadCookies() {
     try {
-      const cookiesPath = resolve(this.cookiesFile);
-      const content = readFileSync(cookiesPath, 'utf-8');
-
-      // Parse cookies.txt format (tab-separated: name, value, domain, path, ...)
-      const cookies = {};
-      const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-
-      for (const line of lines) {
-        const parts = line.split('\t');
-        if (parts.length >= 2) {
-          const name = parts[0].trim();
-          const value = parts[1].trim();
-
-          // Sanitize cookie value - remove any control characters and newlines
-          const sanitized = value.replace(/[\x00-\x1F\x7F]/g, '');
-
-          if (name && sanitized) {
-            cookies[name] = sanitized;
-          }
-        }
+      // Check for base64-encoded cookies from environment (Render deployment)
+      if (process.env.COOKIES_B64) {
+        console.log('✓ Loading cookies from COOKIES_B64 environment variable');
+        const content = Buffer.from(process.env.COOKIES_B64, 'base64').toString('utf-8');
+        return this.parseCookiesContent(content);
       }
 
-      return cookies;
+      // Fallback to file-based loading (local development)
+      const cookiesPath = resolve(this.cookiesFile);
+      const content = readFileSync(cookiesPath, 'utf-8');
+      console.log('✓ Loading cookies from file:', cookiesPath);
+      return this.parseCookiesContent(content);
     } catch (error) {
       console.error('Failed to load cookies:', error.message);
       return {};
     }
+  }
+
+  parseCookiesContent(content) {
+    // Parse cookies.txt format (tab-separated: name, value, domain, path, ...)
+    const cookies = {};
+    const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+    for (const line of lines) {
+      const parts = line.split('\t');
+      if (parts.length >= 2) {
+        const name = parts[0].trim();
+        const value = parts[1].trim();
+
+        // Sanitize cookie value - remove any control characters and newlines
+        const sanitized = value.replace(/[\x00-\x1F\x7F]/g, '');
+
+        if (name && sanitized) {
+          cookies[name] = sanitized;
+        }
+      }
+    }
+
+    return cookies;
   }
 
   getCookieString() {
@@ -56,6 +68,15 @@ class Config {
 
   loadHeaders() {
     try {
+      // Check for base64-encoded headers from environment (Render deployment)
+      if (process.env.HEADERS_B64) {
+        console.log('✓ Loading headers from HEADERS_B64 environment variable');
+        const content = Buffer.from(process.env.HEADERS_B64, 'base64').toString('utf-8');
+        const headers = JSON.parse(content);
+        return headers;
+      }
+
+      // Fallback to file-based loading (local development)
       const headersPath = resolve(this.headersFile);
       if (!existsSync(headersPath)) {
         console.warn('⚠️  headers.json not found - using default headers (may cause auth errors)');
@@ -65,7 +86,7 @@ class Config {
 
       const content = readFileSync(headersPath, 'utf-8');
       const headers = JSON.parse(content);
-      console.log('✓ Loaded custom headers from headers.json');
+      console.log('✓ Loaded custom headers from file:', headersPath);
       return headers;
     } catch (error) {
       console.error('Failed to load headers.json:', error.message);
