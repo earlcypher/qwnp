@@ -82,15 +82,20 @@ class QwenClient {
 
         res.on('end', () => {
           try {
+            console.log('[Qwen API] Create chat response status:', res.statusCode);
+            console.log('[Qwen API] Create chat response body:', data.substring(0, 500));
+
             const parsed = JSON.parse(data);
             if (parsed.success && parsed.data && parsed.data.id) {
               console.log('[Qwen API] Created new chat:', parsed.data.id);
               resolve(parsed.data.id);
             } else {
+              console.error('[Qwen API] Create chat failed - parsed response:', parsed);
               reject(new Error('Failed to create chat: ' + data));
             }
           } catch (e) {
-            reject(new Error('Failed to parse create chat response'));
+            console.error('[Qwen API] Failed to parse create chat response. Raw data:', data.substring(0, 500));
+            reject(new Error('Failed to parse create chat response: ' + data.substring(0, 200)));
           }
         });
       });
