@@ -417,11 +417,16 @@ router.post('/cookies/upload', requireAdmin, async (req, res) => {
 
 /**
  * POST /admin/cookies/test
- * Test connection to Qwen API with current cookies
+ * Test connection to Qwen API with current cookies or provided credentials
+ * Body (optional): { cookies: string, headers: { bxUa: string, bxUmidtoken: string } }
  */
 router.post('/cookies/test', requireAdmin, async (req, res) => {
   try {
-    const result = await cookieService.testConnection();
+    // Extract optional test credentials from request body
+    const { cookies, headers } = req.body || {};
+
+    // Test with provided credentials or fall back to saved files
+    const result = await cookieService.testConnection(cookies, headers);
 
     res.json({
       success: true,

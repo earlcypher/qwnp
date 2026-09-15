@@ -120,21 +120,56 @@ class CookieService {
   }
 
   /**
-   * Test connection to Qwen API with current cookies
+   * Test connection to Qwen API with current cookies or provided credentials
+   * @param {string|null} cookiesContent - Optional Netscape format cookies to test
+   * @param {object|null} headersPayload - Optional headers like { bxUa, bxUmidtoken }
    */
-  async testConnection() {
+  async testConnection(cookiesContent = null, headersPayload = null) {
     try {
-      const cookieString = config.getCookieString();
+      let cookieString;
+      let customHeaders = {};
 
-      if (!cookieString) {
-        return {
-          success: false,
-          error: 'No cookies configured'
-        };
+      // If temporary credentials provided, use them
+      if (cookiesContent) {
+        // Parse Netscape format to extract cookies
+        const cookies = this.parseCookiesFromNetscape(cookiesContent);
+
+        if (!cookies.token) {
+          return {
+            success: false,
+            error: 'Missing required "token" cookie'
+          };
+        }
+
+        // Build cookie string
+        cookieString = Object.entries(cookies)
+          .map(([name, value]) => `${name}=${value}`)
+          .join('; ');
+
+        // Add custom headers if provided
+        if (headersPayload) {
+          if (headersPayload.bxUa) customHeaders['bx-ua'] = headersPayload.bxUa;
+          if (headersPayload.bxUmidtoken) customHeaders['bx-umidtoken'] = headersPayload.bxUmidtoken;
+        }
+      } else {
+        // Fall back to saved cookies
+        cookieString = config.getCookieString();
+
+        if (!cookieString) {
+          return {
+            success: false,
+            error: 'No cookies configured'
+          };
+        }
+
+        // Use saved headers if available
+        if (config.headers) {
+          customHeaders = config.headers;
+        }
       }
 
       // Test by calling Qwen's model list endpoint
-      const result = await this.makeTestRequest(cookieString);
+      const result = await this.makeTestRequest(cookieString, customHeaders);
 
       return {
         success: result.success,
@@ -155,20 +190,48 @@ class CookieService {
   }
 
   /**
-   * Make a test request to Qwen API
+   * Parse Netscape cookie format to extract cookie name-value pairs
+   * @param {string} content - Netscape format cookie content
+   * @returns {object} Cookie name-value pairs
    */
-  makeTestRequest(cookieString) {
+  parseCookiesFromNetscape(content) {
+    const cookies = {};
+    const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+
+    for (const line of lines) {
+      const parts = line.split('\t');
+      if (parts.length >= 7) {
+        const name = parts[5].trim();
+        const value = parts[6].trim();
+        if (name && value) {
+          cookies[name] = value;
+        }
+      }
+    }
+
+    return cookies;
+  }
+
+  /**
+   * Make a test request to Qwen API
+   * @param {string} cookieString - Cookie header value
+   * @param {object} customHeaders - Optional custom headers like bx-ua, bx-umidtoken
+   */
+  makeTestRequest(cookieString, customHeaders = {}) {
     return new Promise((resolve) => {
       const startTime = Date.now();
 
+      const headers = {
+        'Cookie': cookieString,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ...customHeaders
+      };
+
       const options = {
-        hostname: 'qwen.chat.qq.com',
-        path: '/api/v1/models',
+        hostname: 'chat.qwen.ai',
+        path: '/api/v2/models',
         method: 'GET',
-        headers: {
-          'Cookie': cookieString,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
+        headers,
         timeout: 10000
       };
 
