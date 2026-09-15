@@ -205,7 +205,7 @@ router.delete('/api-keys/:id', requireAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'API key deactivated successfully',
+      message: 'API key deleted permanently',
       data: {
         id: deletedKey.id,
         name: deletedKey.name,

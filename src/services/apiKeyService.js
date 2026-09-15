@@ -137,7 +137,7 @@ export async function updateApiKey(keyId, updates) {
 }
 
 /**
- * Delete (deactivate) API key
+ * Delete API key permanently
  * @param {string} keyId - UUID of the key
  * @returns {Object} Deleted API key object
  */
@@ -146,10 +146,10 @@ export async function deleteApiKey(keyId) {
     throw new Error('Supabase not configured');
   }
 
-  // Soft delete by setting is_active to false
+  // Hard delete - permanently remove from database
   const { data, error } = await supabase
     .from('api_keys')
-    .update({ is_active: false })
+    .delete()
     .eq('id', keyId)
     .select()
     .single();
@@ -159,7 +159,7 @@ export async function deleteApiKey(keyId) {
     throw new Error(`Failed to delete API key: ${error.message}`);
   }
 
-  console.log(`[API Key Service] Deleted (deactivated) key: ${keyId}`);
+  console.log(`[API Key Service] Permanently deleted key: ${keyId}`);
   return data;
 }
 
