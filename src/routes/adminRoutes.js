@@ -12,7 +12,9 @@ import {
   getUsageStats,
   getKeyStats
 } from '../services/analyticsService.js';
-import { requireAdmin } from '../middleware/authMiddleware.js';
+import { requireAuth, requireEnterprise } from '../middleware/authMiddleware.js';
+
+const requireAdmin = [requireAuth, requireEnterprise];
 import supabase from '../supabaseClient.js';
 import cookieService from '../services/cookieService.js';
 

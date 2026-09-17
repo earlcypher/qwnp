@@ -95,27 +95,3 @@ function getErrorType(statusCode) {
   return 'unknown_error';
 }
 
-/**
- * Update API key usage stats
- * Called after logging to keep usage_count in sync
- */
-export async function updateKeyUsageStats(apiKeyId) {
-  if (!supabase || !apiKeyId) return;
-
-  try {
-    // Increment usage_count and update last_used_at
-    const { error } = await supabase
-      .from('api_keys')
-      .update({
-        usage_count: supabase.raw('usage_count + 1'),
-        last_used_at: new Date().toISOString()
-      })
-      .eq('id', apiKeyId);
-
-    if (error) {
-      console.error('[Logger] Failed to update key stats:', error.message);
-    }
-  } catch (error) {
-    console.error('[Logger] Error updating key stats:', error.message);
-  }
-}

@@ -6,6 +6,7 @@ import { generateRequestId, getTimezoneHeader } from './utils.js';
 const QWEN_BASE_URL = 'chat.qwen.ai';
 const MODELS_ENDPOINT = '/api/v2/models';
 const CHAT_ENDPOINT = '/api/v2/chat/completions';
+const REQUEST_TIMEOUT = 60000;
 
 /**
  * Qwen API Client
@@ -76,6 +77,7 @@ class QwenClient {
         hostname: QWEN_BASE_URL,
         path: '/api/v2/chats/new',
         method: 'POST',
+        timeout: REQUEST_TIMEOUT,
         headers: {
           ...this.getHeaders('new-chat'),
           'Content-Length': Buffer.byteLength(bodyStr)
@@ -92,19 +94,13 @@ class QwenClient {
 
         res.on('end', () => {
           try {
-            console.log('[Qwen API] Create chat response status:', res.statusCode);
-            console.log('[Qwen API] Create chat response body:', data.substring(0, 500));
-
             const parsed = JSON.parse(data);
             if (parsed.success && parsed.data && parsed.data.id) {
-              console.log('[Qwen API] Created new chat:', parsed.data.id);
               resolve(parsed.data.id);
             } else {
-              console.error('[Qwen API] Create chat failed - parsed response:', parsed);
               reject(new Error('Failed to create chat: ' + data));
             }
           } catch (e) {
-            console.error('[Qwen API] Failed to parse create chat response. Raw data:', data.substring(0, 500));
             reject(new Error('Failed to parse create chat response: ' + data.substring(0, 200)));
           }
         });
@@ -112,6 +108,11 @@ class QwenClient {
 
       req.on('error', (e) => {
         reject(e);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Qwen API timeout'));
       });
 
       req.write(bodyStr);
@@ -128,6 +129,7 @@ class QwenClient {
         hostname: QWEN_BASE_URL,
         path: MODELS_ENDPOINT,
         method: 'GET',
+        timeout: REQUEST_TIMEOUT,
         headers: this.getHeaders(''),
         agent: this.proxyAgent
       };
@@ -153,6 +155,11 @@ class QwenClient {
         reject(e);
       });
 
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Qwen API timeout'));
+      });
+
       req.end();
     });
   }
@@ -169,6 +176,7 @@ class QwenClient {
         hostname: QWEN_BASE_URL,
         path: path,
         method: 'POST',
+        timeout: REQUEST_TIMEOUT,
         headers: {
           ...this.getHeaders(chatId),
           'Content-Length': Buffer.byteLength(bodyStr)
@@ -176,20 +184,20 @@ class QwenClient {
         agent: this.proxyAgent
       };
 
-      console.log('[Qwen API] Request URL:', `https://${options.hostname}${options.path}`);
-      console.log('[Qwen API] Request headers:', JSON.stringify(options.headers, null, 2));
-      console.log('[Qwen API] Request body:', bodyStr.substring(0, 500));
+      if (process.env.DEBUG === 'true') {
+        console.log('[Qwen API] Request URL:', `https://${options.hostname}${options.path}`);
+        console.log('[Qwen API] Request body:', bodyStr.substring(0, 500));
+      }
 
       const req = https.request(options, (res) => {
-        console.log(`[Qwen API] Response status: ${res.statusCode}`);
-        console.log('[Qwen API] Response headers:', JSON.stringify(res.headers, null, 2));
+        if (process.env.DEBUG === 'true') {
+          console.log(`[Qwen API] Response status: ${res.statusCode}`);
+        }
 
         // Handle streaming response
         if (onStream && requestBody.stream) {
           res.on('data', (chunk) => {
             try {
-              const chunkStr = chunk.toString();
-              console.log('[Qwen API] Received chunk:', chunkStr.substring(0, 200));
               onStream(chunk);
             } catch (e) {
               console.error('Stream processing error:', e);
@@ -213,13 +221,10 @@ class QwenClient {
 
           res.on('end', () => {
             try {
-              console.log('[Qwen API] Full response:', data.substring(0, 500));
-
               // Check if this is an error response
               try {
                 const errorCheck = JSON.parse(data);
                 if (errorCheck.success === false) {
-                  console.error('[Qwen API] Error response:', errorCheck);
                   reject(new Error(`Qwen API error: ${errorCheck.data?.code} - ${errorCheck.data?.details || 'Unknown error'}`));
                   return;
                 }
@@ -237,8 +242,6 @@ class QwenClient {
                   if (jsonStr && jsonStr !== '[DONE]') {
                     try {
                       const parsed = JSON.parse(jsonStr);
-                      console.log('[Qwen API] Parsed chunk:', JSON.stringify(parsed).substring(0, 200));
-
                       if (parsed.choices && parsed.choices[0]?.delta?.content) {
                         fullContent += parsed.choices[0].delta.content;
                       } else if (parsed.output && parsed.output.text) {
@@ -253,7 +256,6 @@ class QwenClient {
                 }
               }
 
-              console.log('[Qwen API] Extracted content length:', fullContent.length);
               resolve(fullContent);
             } catch (e) {
               reject(new Error('Failed to parse chat response: ' + e.message));
@@ -264,6 +266,11 @@ class QwenClient {
 
       req.on('error', (e) => {
         reject(e);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Qwen API timeout'));
       });
 
       req.write(bodyStr);

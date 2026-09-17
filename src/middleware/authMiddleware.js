@@ -121,23 +121,19 @@ export async function optionalAuth(req, res, next) {
 }
 
 /**
- * Admin authentication middleware
- * Requires enterprise tier API key
+ * Enterprise tier check middleware
+ * Use after requireAuth in middleware chain
  */
-export async function requireAdmin(req, res, next) {
-  // Run requireAuth first
-  await requireAuth(req, res, () => {
-    // Check if user has admin privileges (enterprise tier)
-    if (req.tier !== 'enterprise') {
-      return res.status(403).json({
-        error: {
-          message: 'Admin access required. Enterprise tier API key needed.',
-          type: 'authorization_error',
-          code: 'insufficient_permissions'
-        }
-      });
-    }
+export function requireEnterprise(req, res, next) {
+  if (req.tier !== 'enterprise') {
+    return res.status(403).json({
+      error: {
+        message: 'Admin access required. Enterprise tier API key needed.',
+        type: 'authorization_error',
+        code: 'insufficient_permissions'
+      }
+    });
+  }
 
-    next();
-  });
+  next();
 }

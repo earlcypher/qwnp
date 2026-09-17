@@ -8,6 +8,7 @@ import {
   createOpenAIResponse
 } from './utils.js';
 import { requireAuth } from './middleware/authMiddleware.js';
+import { rateLimit } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import adminRoutes from './routes/adminRoutes.js';
 import supabase from './supabaseClient.js';
@@ -16,7 +17,7 @@ import supabase from './supabaseClient.js';
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Request logging (console + database)
 app.use((req, res, next) => {
@@ -95,7 +96,7 @@ app.get('/health/credentials', async (req, res) => {
 app.use('/admin', adminRoutes);
 
 // Get models - OpenAI compatible
-app.get('/v1/models', requireAuth, async (req, res) => {
+app.get('/v1/models', requireAuth, rateLimit, async (req, res) => {
   try {
     const qwenModels = await qwenClient.getModels();
 
@@ -174,7 +175,7 @@ app.get('/v1/models', requireAuth, async (req, res) => {
 });
 
 // Chat completions - OpenAI compatible
-app.post('/v1/chat/completions', requireAuth, async (req, res) => {
+app.post('/v1/chat/completions', requireAuth, rateLimit, async (req, res) => {
   try {
     const openaiRequest = req.body;
 
